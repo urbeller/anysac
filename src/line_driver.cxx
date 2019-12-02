@@ -69,7 +69,7 @@ int main(int argc, char **argv)
 
 
   // Init the driver.
-  LineDriver ld(pts, 0.01);
+  LineDriver ld(pts, 0.01); // the minimum distance to consider a point an inlier.
   
   // Solve the problem.
   Pt2d sol;
