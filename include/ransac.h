@@ -5,6 +5,7 @@
 #include <vector>
 #include <random>
 #include <limits>
+#include "utils.h"
 
 using namespace std;
 
@@ -30,9 +31,7 @@ namespace AnySac
           maxAttempts(300), 
           maxIters(300), 
           conf(conf_),
-          rnd_gen((unsigned int)time(0)),
-          rnd_dist(0, k.data_size() - 1)
-
+          rng((unsigned int)time(0))
       {
       }
 
@@ -46,44 +45,34 @@ namespace AnySac
           int         dataSize = driver.data_size();
           int         niter    = maxIters;
           int         maxCount = 0;
+          float       inliersErrors = 0;
+
           vector<int> ndices(modelSize);
-          vector<ModelType> models;
-          bool has_generator = driver.has_generator();
+          std::vector<unsigned char> inliersFlags(dataSize);
+          ModelType tmpModel;
 
           for (int iter=0; iter<niter; iter++)
           {
             if ( dataSize >= modelSize )
             {
 
-
-              bool found = (has_generator) ? driver.get_subset(ndices) : get_subset(ndices);
-
-              if( !found )
-              {
-                if( iter == 0 )
-                  return 0;
-
-                break;
-              }
+               AnySac::choiceKnuth(dataSize, modelSize, rng, ndices);
 
               // We got a valid subset. Estimate a model.
-              if( !driver.fit_model ( ndices, models ) )
+              if( !driver.fit_model ( ndices, tmpModel ) )
               {
                 //return 0;
               }
 
               // Find the best model.
-              for(unsigned int m = 0, len = models.size(); m<len; m++)
+              int count = driver.count_inliers( tmpModel, inliersFlags, inliersErrors);
+
+              if( count > std::max(maxCount, modelSize-1) )
               {
-                int count = driver.count_inliers( models[m] );
+                maxCount = count;
 
-                if( count > std::max(maxCount, modelSize-1) )
-                {
-                  maxCount = count;
-
-                  model = models[m];
-                  niter = update_niters(conf, double(dataSize-count)/dataSize, modelSize, niter);
-                }
+                model = tmpModel;
+                niter = update_niters(conf, double(dataSize-count)/dataSize, modelSize, niter);
               }
 
             } 
@@ -96,46 +85,12 @@ namespace AnySac
           }
 
           // Update the inliers count and the inliers mask.
-          maxCount = driver.count_inliers( model );
+          maxCount = driver.count_inliers( tmpModel, inliersFlags, inliersErrors);
+
           return maxCount;
         }
 
       private:
-
-        // Pick a random combination of indices.
-        bool get_subset( vector<int> &pickedIndex)
-        {
-
-          int j, i=0, iter=0;
-          int dataSize  = driver.data_size();
-          int modelSize = driver.model_size();
-
-          for (; iter< maxAttempts; iter++)
-          {
-
-            for (i=0; i<modelSize && iter<maxAttempts; )
-            {
-              pickedIndex[i] = rnd_dist(rnd_gen);
-
-              for (j = 0; j < i; j++ )
-                if (pickedIndex[j] == pickedIndex[i])
-                  break;
-
-              if (j < i)
-                continue;
-
-              i++;
-            }
-
-            if (i==modelSize && !driver.check_subset(pickedIndex))
-              continue;
-
-            break;
-          }
-
-          return i == modelSize && iter < maxAttempts;
-        }
-
 
         // Update the minimal number of ransac iterations.
         int update_niters( double p, double ep, int modelPoints, int maxIter) const
@@ -166,8 +121,7 @@ namespace AnySac
         double      conf;
 
         // For combinations generation.
-        std::mt19937 rnd_gen;
-        std::uniform_int_distribution<> rnd_dist;
+        std::mt19937 rng;
     };
 }
 
