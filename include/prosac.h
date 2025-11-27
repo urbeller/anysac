@@ -6,7 +6,7 @@
 #include <limits>
 #include <cassert>
 #include <numeric>
-#include "utils.h"
+#include "anysac_utils.h"
 
 // Taken from : https://github.com/RomanJuranek/librectify/blob/master/src/prosac.h
 
