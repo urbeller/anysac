@@ -21,6 +21,7 @@ namespace AnySac
   // bool has_generator();
   // bool get_subset(vector<int> &indices);
 
+    
   template< typename DriverType, typename ModelType>
     class Ransac
     {
@@ -38,7 +39,7 @@ namespace AnySac
         // Solve the problem.
         // Input: a model object (driver).
         // Returns: number of inliers.
-        int solve(ModelType &model)
+        int solve(ModelType &model, std::vector<unsigned char> &mask)
         {
 
           int         modelSize = driver.model_size();
@@ -48,9 +49,9 @@ namespace AnySac
           float       inliersErrors = 0;
 
           vector<int> ndices(modelSize);
-          std::vector<unsigned char> inliersFlags(dataSize);
           ModelType tmpModel;
-
+          mask.resize(dataSize);
+            
           for (int iter=0; iter<niter; iter++)
           {
             if ( dataSize >= modelSize )
@@ -61,18 +62,17 @@ namespace AnySac
               // We got a valid subset. Estimate a model.
               if( !driver.fit_model ( ndices, tmpModel ) )
               {
-                //return 0;
+                  continue;
               }
 
               // Find the best model.
-              int count = driver.count_inliers( tmpModel, inliersFlags, inliersErrors);
+              int count = driver.count_inliers( tmpModel, mask, inliersErrors);
 
               if( count > std::max(maxCount, modelSize-1) )
               {
                 maxCount = count;
-
                 model = tmpModel;
-                niter = update_niters(conf, double(dataSize-count)/dataSize, modelSize, niter);
+                niter = update_niters(conf, double(dataSize-maxCount)/dataSize, modelSize, niter);
               }
 
             } 
@@ -84,12 +84,19 @@ namespace AnySac
 
           }
 
-          // Update the inliers count and the inliers mask.
-          maxCount = driver.count_inliers( tmpModel, inliersFlags, inliersErrors);
-
+            if(maxCount > 0)
+            {
+                for(int r = 0; r < 3; ++r)
+                    for(int c = 0; c < 3; ++c)
+                        model.m[r][c] /= model.m[2][2];
+                
+                // Update the inliers count and the inliers mask.
+                maxCount = driver.count_inliers( model, mask, inliersErrors);
+            }
+            
           return maxCount;
         }
-
+        
       private:
 
         // Update the minimal number of ransac iterations.
@@ -120,6 +127,7 @@ namespace AnySac
         int         maxIters;
         double      conf;
 
+        
         // For combinations generation.
         std::mt19937 rng;
     };
