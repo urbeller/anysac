@@ -243,6 +243,7 @@ namespace AnySac
             const int N_draw = N;
             const int m = m_driver.model_size();
             std::vector<int> sample(m);
+            float inliersError;
 
             std::random_device rd;
             m_rgn = std::mt19937(rd());
@@ -257,7 +258,11 @@ namespace AnySac
           {
               std::iota(sample.begin(), sample.end(), 0);
               bool status = m_driver.fit_model(sample, bestModel);
-              return status;
+              if(!status)
+                  return 0;
+              
+              int maxCount = m_driver.count_inliers( bestModel, mask, inliersError);
+              return maxCount;
           }
             
           assert(beta > 0. && beta < 1.);
@@ -403,7 +408,6 @@ namespace AnySac
                 
             } // while(t <= k_n_star ...
           
-            float inliersError;
             int maxCount = m_driver.count_inliers( bestModel, mask, inliersError);
             return maxCount;
         }
